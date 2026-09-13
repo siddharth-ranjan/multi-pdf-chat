@@ -123,7 +123,9 @@ DARK_CSS = """
 [data-testid="stSidebarCollapseButton"] svg, [data-testid="stExpandSidebarButton"] svg {fill: var(--text);}
 [data-testid="stFileUploaderDropzone"] {background-color: var(--surface-2) !important; color: var(--text);}
 [data-testid="stFileUploaderDropzoneInstructions"] span, [data-testid="stFileUploaderDropzoneInstructions"] small {color: var(--muted) !important;}
-[data-testid="stFileUploader"] section + div, [data-testid="stFileUploaderFile"] {color: var(--text);}
+/* Uploaded-file rows use hard-coded light backgrounds */
+[data-testid="stFileUploader"] div:not([data-testid="stFileUploaderDropzone"]) {background-color: transparent !important;}
+[data-testid="stFileUploader"] small, [data-testid="stFileUploader"] div {color: var(--text);}
 [data-testid="stBaseButton-secondary"] {
     background-color: var(--surface-2) !important; color: var(--text) !important; border-color: var(--border) !important;
 }
@@ -135,6 +137,7 @@ DARK_CSS = """
 [data-testid="stChatInputTextArea"] {background-color: var(--surface) !important; color: var(--text) !important;}
 [data-testid="stChatInputTextArea"]::placeholder {color: var(--muted) !important;}
 [data-testid="stAlert"] > div {background-color: var(--surface-2) !important;}
+[data-testid^="stChatMessageAvatar"] {background-color: var(--surface-2) !important; color: var(--text);}
 hr {border-color: var(--border) !important;}
 </style>
 """
@@ -426,9 +429,9 @@ def main():
     if not st.session_state.messages:
         st.markdown('<div class="muted">✨ Suggested for these documents:</div>', unsafe_allow_html=True)
         suggestions = entry.get("suggestions") or FALLBACK_QUESTIONS
-        cols = st.columns(len(suggestions))
-        for i, (col, suggestion) in enumerate(zip(cols, suggestions)):
-            if col.button(suggestion, key=f"suggestion_{i}", use_container_width=True):
+        # One per row: AI-written questions are too long for side-by-side columns
+        for i, suggestion in enumerate(suggestions):
+            if st.button(f"💬 {suggestion}", key=f"suggestion_{i}", use_container_width=True):
                 question = suggestion
 
     typed = st.chat_input("Ask a question about your documents…")
