@@ -338,8 +338,8 @@ def main():
                 answer = f"⚠️ Sorry, I couldn't get an answer right now ({type(e).__name__}). Please try again."
         st.markdown(answer)
     st.session_state.messages.append({"role": "assistant", "content": answer})
-    if typed is None:
-        st.rerun()
+    # Redraw from history so the suggestion buttons disappear after the first question
+    st.rerun()
 
 
 if __name__ == "__main__":
