@@ -142,8 +142,12 @@ CSS = """
 @keyframes dots {0% {content: "";} 25% {content: ".";} 50% {content: "..";} 75% {content: "...";}}
 @media (prefers-reduced-motion: reduce) {.skeleton, .framing .sparkle, .framing .dots::after {animation: none;}}
 @media (max-width: 640px) {
-    /* Leave room for the Documents pill above the hero */
+    /* The chat layout scrolls to the bottom, so give the Documents pill a solid bar to scroll under */
     .block-container {padding-top: 4.25rem;}
+    [data-testid="stHeader"] {
+        background: color-mix(in srgb, var(--bg) 88%, transparent) !important;
+        backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
+    }
     .steps {grid-template-columns: 1fr;}
     .hero {padding: 22px;}
     .hero h1 {font-size: 1.6rem;}
