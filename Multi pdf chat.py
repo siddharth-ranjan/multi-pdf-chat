@@ -64,7 +64,7 @@ CSS = """
     box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35); font-weight: 600; font-size: 0.9rem;
 }
 [data-testid="stExpandSidebarButton"]::after {content: "Documents";}
-[data-testid="stExpandSidebarButton"] svg {fill: white !important; color: white !important;}
+[data-testid="stExpandSidebarButton"] *, [data-testid="stExpandSidebarButton"] svg {fill: white !important; color: white !important;}
 [data-testid="stSidebarCollapseButton"] button {border-radius: 999px;}
 .block-container {padding-top: 2rem; max-width: 860px;}
 [data-testid="stSidebar"] {
