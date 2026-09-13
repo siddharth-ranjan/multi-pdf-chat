@@ -1,0 +1,3 @@
+chatpdf.siddharthranjan.app {
+	reverse_proxy app:8501
+}

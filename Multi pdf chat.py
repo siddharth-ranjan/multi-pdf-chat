@@ -1,22 +1,18 @@
 import streamlit as st
-from PyPDF2 import PdfReader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from pypdf import PdfReader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 import os
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-import google.generativeai as genai
-from langchain.vectorstores import FAISS
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.question_answering import load_qa_chain
-from langchain.prompts import PromptTemplate
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
 
 load_dotenv()
-os.getenv("GOOGLE_API_KEY")
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+os.environ.setdefault("GOOGLE_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
 
-
-
-
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-001")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-2.5-flash")
 
 
 def get_pdf_text(pdf_docs):
@@ -24,7 +20,7 @@ def get_pdf_text(pdf_docs):
     for pdf in pdf_docs:
         pdf_reader= PdfReader(pdf)
         for page in pdf_reader.pages:
-            text+= page.extract_text()
+            text+= page.extract_text() or ""
     return  text
 
 
@@ -36,9 +32,9 @@ def get_text_chunks(text):
 
 
 def get_vector_store(text_chunks):
-    embeddings = GoogleGenerativeAIEmbeddings(model = "models/embedding-001")
-    vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
-    vector_store.save_local("faiss_index")
+    embeddings = GoogleGenerativeAIEmbeddings(model = EMBEDDING_MODEL)
+    # Kept per browser session so users never see each other's documents
+    st.session_state.vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
 
 
 def get_conversational_chain():
@@ -52,31 +48,29 @@ def get_conversational_chain():
     Answer:
     """
 
-    model = ChatGoogleGenerativeAI(model="gemini-pro",
+    model = ChatGoogleGenerativeAI(model=CHAT_MODEL,
                              temperature=0.3)
 
     prompt = PromptTemplate(template = prompt_template, input_variables = ["context", "question"])
-    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
+    chain = prompt | model | StrOutputParser()
 
     return chain
 
 
 
 def user_input(user_question):
-    embeddings = GoogleGenerativeAIEmbeddings(model = "models/embedding-001")
-    
-    new_db = FAISS.load_local("faiss_index", embeddings)
-    docs = new_db.similarity_search(user_question)
+    vector_store = st.session_state.get("vector_store")
+    if vector_store is None:
+        st.warning("Upload your PDF files and click Submit & Process first.")
+        return
+
+    docs = vector_store.similarity_search(user_question)
+    context = "\n\n".join(doc.page_content for doc in docs)
 
     chain = get_conversational_chain()
+    response = chain.invoke({"context": context, "question": user_question})
 
-    
-    response = chain(
-        {"input_documents":docs, "question": user_question}
-        , return_only_outputs=True)
-
-    print(response)
-    st.write("Reply: ", response["output_text"])
+    st.write("Reply: ", response)
 
 
 
@@ -94,11 +88,14 @@ def main():
         st.title("Menu:")
         pdf_docs = st.file_uploader("Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True)
         if st.button("Submit & Process"):
-            with st.spinner("Processing..."):
-                raw_text = get_pdf_text(pdf_docs)
-                text_chunks = get_text_chunks(raw_text)
-                get_vector_store(text_chunks)
-                st.success("Done")
+            if not pdf_docs:
+                st.warning("Please upload at least one PDF.")
+            else:
+                with st.spinner("Processing..."):
+                    raw_text = get_pdf_text(pdf_docs)
+                    text_chunks = get_text_chunks(raw_text)
+                    get_vector_store(text_chunks)
+                    st.success("Done")
 
 
 
