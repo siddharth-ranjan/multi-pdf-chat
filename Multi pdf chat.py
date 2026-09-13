@@ -55,8 +55,50 @@ CSS = """
     --chip-bg: #EEF2FF; --chip-text: #3730A3; --chip-sub: #6366F1; --num-bg: #EEF2FF;
     --accent: #4F46E5;
 }
-#MainMenu, footer, [data-testid="stToolbar"] {visibility: hidden;}
+/* Hide Streamlit's menu but keep the toolbar: the "open sidebar" button lives in it */
+#MainMenu, footer, [data-testid="stToolbarActions"], [data-testid="stMainMenu"], [data-testid="stDecoration"] {display: none !important;}
+[data-testid="stHeader"] {background: transparent !important;}
+[data-testid="stExpandSidebarButton"] {
+    width: auto !important; height: auto !important; gap: 6px; padding: 7px 14px 7px 10px !important;
+    background: var(--accent) !important; color: white !important; border-radius: 999px !important;
+    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35); font-weight: 600; font-size: 0.9rem;
+}
+[data-testid="stExpandSidebarButton"]::after {content: "Documents";}
+[data-testid="stExpandSidebarButton"] svg {fill: white !important; color: white !important;}
+[data-testid="stSidebarCollapseButton"] button {border-radius: 999px;}
 .block-container {padding-top: 2rem; max-width: 860px;}
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, var(--chip-bg) 0%, var(--surface) 220px) !important;
+    border-right: 1px solid var(--border);
+}
+[data-testid="stSidebarUserContent"] {padding-top: 0.5rem;}
+.brand-card {
+    display: flex; gap: 12px; align-items: center; padding: 14px; border-radius: 16px; margin-bottom: 12px;
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 60%, #DB2777 100%);
+    box-shadow: 0 8px 22px rgba(79, 70, 229, 0.28);
+}
+.brand-card .logo {
+    width: 40px; height: 40px; flex: none; border-radius: 12px; background: rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center; font-size: 1.35rem;
+}
+.brand-card .name {color: white; font-weight: 800; font-size: 1.15rem; line-height: 1.2;}
+.brand-card .tag {color: rgba(255,255,255,0.85); font-size: 0.78rem; line-height: 1.3;}
+.side-label {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); margin: 10px 0 6px 0;
+}
+[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {
+    border: 1.5px dashed var(--accent); border-radius: 14px; background-color: var(--surface);
+}
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"], [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {
+    border-radius: 12px; min-height: 42px; font-weight: 600;
+}
+.limits {display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px 0;}
+.limits span {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 999px; padding: 3px 10px; font-size: 0.78rem;
+}
+.privacy {display: flex; gap: 8px; color: var(--muted); font-size: 0.8rem; line-height: 1.4;}
 .hero {
     background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 55%, #DB2777 100%);
     border-radius: 18px; padding: 28px 32px; color: white; margin-bottom: 1.5rem;
@@ -122,10 +164,9 @@ DARK_CSS = """
 [data-testid="stBottom"], [data-testid="stBottom"] > div, [data-testid="stBottomBlockContainer"] {
     background-color: var(--bg) !important;
 }
-[data-testid="stHeader"] {background: transparent !important;}
-[data-testid="stSidebar"], [data-testid="stSidebarContent"] {
-    background-color: var(--surface) !important; border-right: 1px solid var(--border);
-}
+[data-testid="stSidebar"] {background: linear-gradient(180deg, #171C3D 0%, var(--surface) 220px) !important;}
+[data-testid="stSidebarContent"] {background: transparent !important;}
+[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"] {background-color: var(--surface-2) !important;}
 [data-testid="stApp"] p, [data-testid="stApp"] li, [data-testid="stApp"] label,
 [data-testid="stApp"] span, [data-testid="stMarkdownContainer"],
 [data-testid="stWidgetLabel"], [data-testid="stCaptionContainer"] {
@@ -134,7 +175,7 @@ DARK_CSS = """
 [data-testid="stApp"] h1, [data-testid="stApp"] h2, [data-testid="stApp"] h3,
 [data-testid="stApp"] strong {color: var(--heading);}
 [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {color: var(--muted) !important;}
-[data-testid="stSidebarCollapseButton"] svg, [data-testid="stExpandSidebarButton"] svg {fill: var(--text);}
+[data-testid="stSidebarCollapseButton"] svg {fill: var(--text);}
 [data-testid="stFileUploaderDropzone"] {background-color: var(--surface-2) !important; color: var(--text);}
 [data-testid="stFileUploaderDropzoneInstructions"] span, [data-testid="stFileUploaderDropzoneInstructions"] small {color: var(--muted) !important;}
 /* Uploaded-file rows use hard-coded light backgrounds */
@@ -342,16 +383,20 @@ def answer_question(vector_store, user_question):
 
 def render_sidebar(entry):
     with st.sidebar:
-        st.markdown('<div class="brand">📄 ChatPDF</div>', unsafe_allow_html=True)
-        st.markdown('<div class="muted">Ask questions about your documents, powered by Gemini.</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="brand-card"><div class="logo">📄</div>'
+            '<div><div class="name">ChatPDF</div><div class="tag">Ask your documents anything, powered by Gemini</div></div></div>',
+            unsafe_allow_html=True,
+        )
         st.toggle("🌙 Dark mode", key="dark_mode")
-        st.divider()
 
+        st.markdown('<div class="side-label">Upload PDFs</div>', unsafe_allow_html=True)
         pdf_docs = st.file_uploader(
             "Upload PDFs",
             type="pdf",
             accept_multiple_files=True,
             key=f"uploader_{st.session_state.uploader_key}",
+            label_visibility="collapsed",
         )
         if st.button("Process documents", type="primary", use_container_width=True):
             error = validate_uploads(pdf_docs) if pdf_docs else "Please upload at least one PDF."
@@ -362,7 +407,7 @@ def render_sidebar(entry):
                 st.rerun()
 
         if entry is not None:
-            st.markdown("**Ready to chat**")
+            st.markdown('<div class="side-label">✅ Ready to chat</div>', unsafe_allow_html=True)
             for doc in entry["docs"]:
                 st.markdown(
                     f'<div class="doc-chip">📘 {doc["name"]}<br><small>{doc["pages"]} page(s)</small></div>',
@@ -374,10 +419,13 @@ def render_sidebar(entry):
                 st.session_state.uploader_key += 1
                 st.rerun()
 
-        st.divider()
-        st.caption(
-            f"Limits: {MAX_FILES} PDFs, {MAX_TOTAL_MB:g} MB, {MAX_PAGES} pages. "
-            f"Documents are deleted when you leave or after {IDLE_TIMEOUT_SECONDS // 60} minutes idle."
+        st.markdown(
+            '<div class="side-label">Limits</div>'
+            f'<div class="limits"><span>📚 {MAX_FILES} PDFs</span><span>💾 {MAX_TOTAL_MB:g} MB</span>'
+            f'<span>📄 {MAX_PAGES} pages</span></div>'
+            '<div class="privacy"><span>🔒</span><span>Documents are deleted when you leave '
+            f"or after {IDLE_TIMEOUT_SECONDS // 60} minutes idle.</span></div>",
+            unsafe_allow_html=True,
         )
 
 
@@ -403,7 +451,7 @@ def render_empty_state():
     st.markdown(
         """
         <div class="steps">
-          <div class="step"><div class="num">1</div><h4>Upload</h4><p>Add up to 3 PDFs from the sidebar.</p></div>
+          <div class="step"><div class="num">1</div><h4>Upload</h4><p>Open <b>Documents</b> and add up to 3 PDFs.</p></div>
           <div class="step"><div class="num">2</div><h4>Process</h4><p>Click <b>Process documents</b> to index them.</p></div>
           <div class="step"><div class="num">3</div><h4>Ask</h4><p>Chat with your documents below.</p></div>
         </div>
@@ -438,7 +486,7 @@ def render_pending_suggestions():
 
 
 def main():
-    st.set_page_config(page_title="ChatPDF", page_icon="📄", layout="centered")
+    st.set_page_config(page_title="ChatPDF · Chat with your PDFs", page_icon="📄", layout="centered")
     start_janitor()
 
     st.session_state.setdefault("messages", [])

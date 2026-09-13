@@ -1,0 +1,45 @@
+<div id="prerender">
+      <aside class="pr-side" aria-hidden="true">
+        <div class="pr-brand"><div class="pr-logo">📄</div><div><div class="pr-name">ChatPDF</div><div class="pr-tag">Ask your documents anything, powered by Gemini</div></div></div>
+        <div class="pr-label">Upload PDFs</div>
+        <div class="pr-drop"></div>
+        <div class="pr-btn"></div>
+      </aside>
+      <main class="pr-main">
+        <span class="pr-docs" aria-hidden="true">☰ Documents</span>
+        <div class="pr-col">
+          <div class="pr-hero">
+            <h1>Chat with your PDFs</h1>
+            <p>Upload documents, then ask anything. Answers come only from what's inside them.</p>
+          </div>
+          <div class="pr-steps">
+            <div class="pr-step"><div class="pr-num">1</div><h2>Upload</h2><p>Open <b>Documents</b> and add up to 3 PDFs.</p></div>
+            <div class="pr-step"><div class="pr-num">2</div><h2>Process</h2><p>Click <b>Process documents</b> to index them.</p></div>
+            <div class="pr-step"><div class="pr-num">3</div><h2>Ask</h2><p>Chat with your documents below.</p></div>
+          </div>
+          <div class="pr-status" id="prerender-status"><span class="pr-dot"></span><span>Starting the app…</span></div>
+          <noscript><p style="margin-top:22px;color:#B91C1C">ChatPDF needs JavaScript enabled to upload and chat.</p><style>#prerender-status{display:none}</style></noscript>
+        </div>
+      </main>
+    </div>
+    <div id="root"></div>
+    <script>
+      // Drop the static screen once the live app has drawn its own hero
+      (function () {
+        var pre = document.getElementById("prerender");
+        var root = document.getElementById("root");
+        var observer;
+        function done() {
+          if (observer) observer.disconnect();
+          if (!pre.parentNode) return;
+          pre.classList.add("gone");
+          setTimeout(function () { pre.remove(); }, 350);
+        }
+        observer = new MutationObserver(function () {
+          if (root.querySelector(".hero")) done();
+        });
+        observer.observe(root, { childList: true, subtree: true });
+        // Never hide Streamlit's own connection errors behind the static screen
+        setTimeout(done, 20000);
+      })();
+    </script>

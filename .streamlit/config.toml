@@ -3,6 +3,8 @@
 maxUploadSize = 10
 # Seconds a disconnected session is kept before Streamlit discards it.
 disconnectedSessionTTL = 60
+# Serves ./static at /app/static (the link-preview image)
+enableStaticServing = true
 
 [browser]
 gatherUsageStats = false
