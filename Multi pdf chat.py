@@ -142,6 +142,8 @@ CSS = """
 @keyframes dots {0% {content: "";} 25% {content: ".";} 50% {content: "..";} 75% {content: "...";}}
 @media (prefers-reduced-motion: reduce) {.skeleton, .framing .sparkle, .framing .dots::after {animation: none;}}
 @media (max-width: 640px) {
+    /* Leave room for the Documents pill above the hero */
+    .block-container {padding-top: 4.25rem;}
     .steps {grid-template-columns: 1fr;}
     .hero {padding: 22px;}
     .hero h1 {font-size: 1.6rem;}
