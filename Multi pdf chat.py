@@ -85,6 +85,20 @@ CSS = """
 [data-testid="stChatMessage"] {
     background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px;
 }
+.framing {display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.85rem; margin: 4px 0 8px 0;}
+.framing .sparkle {display: inline-block; animation: sparkle 1.4s ease-in-out infinite;}
+.framing .dots::after {content: ""; animation: dots 1.5s steps(4, end) infinite;}
+.skeleton {
+    height: 38px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border);
+    background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface) 40%, var(--chip-bg) 50%, var(--surface) 60%, var(--surface-2) 100%);
+    background-size: 300% 100%; animation: shimmer 1.6s ease-in-out infinite;
+}
+.skeleton:nth-child(2) {width: 88%; animation-delay: 0.15s;}
+.skeleton:nth-child(3) {width: 94%; animation-delay: 0.3s;}
+@keyframes shimmer {0% {background-position: 100% 0;} 100% {background-position: 0 0;}}
+@keyframes sparkle {0%, 100% {transform: scale(1) rotate(0deg); opacity: 0.7;} 50% {transform: scale(1.3) rotate(20deg); opacity: 1;}}
+@keyframes dots {0% {content: "";} 25% {content: ".";} 50% {content: "..";} 75% {content: "...";}}
+@media (prefers-reduced-motion: reduce) {.skeleton, .framing .sparkle, .framing .dots::after {animation: none;}}
 @media (max-width: 640px) {
     .steps {grid-template-columns: 1fr;}
     .hero {padding: 22px;}
@@ -201,12 +215,25 @@ def get_session_entry():
         return entry
 
 
-def set_session_store(store, docs, suggestions):
+def set_session_store(store, docs, suggestions=None):
     registry = get_registry()
+    entry = {"store": store, "docs": docs, "suggestions": suggestions, "last_used": time.time()}
     with registry["lock"]:
-        registry["stores"][current_session_id()] = {
-            "store": store, "docs": docs, "suggestions": suggestions, "last_used": time.time(),
-        }
+        registry["stores"][current_session_id()] = entry
+    return entry
+
+
+def start_suggestion_worker(entry, text):
+    # Runs outside the script thread so the chat stays usable while Gemini thinks
+    registry = get_registry()
+
+    def work():
+        suggestions = generate_suggestions(text)
+        with registry["lock"]:
+            # The entry may have been cleared or replaced meanwhile; writing to it is then harmless
+            entry["suggestions"] = suggestions
+
+    threading.Thread(target=work, name="suggestions", daemon=True).start()
 
 
 def clear_session_store():
@@ -366,9 +393,8 @@ def process_uploads(pdf_docs):
             st.session_state.flash = ("error", f"Couldn't index the documents: {type(e).__name__}. Please try again.")
             print(f"indexing failed: {e!r}", flush=True)
             return
-    with st.spinner("Preparing suggested questions…"):
-        suggestions = generate_suggestions(raw_text)
-    set_session_store(store, doc_info, suggestions)
+    entry = set_session_store(store, doc_info)
+    start_suggestion_worker(entry, raw_text)
     st.session_state.messages = []
     st.session_state.flash = ("success", f"Indexed {len(doc_info)} document(s). Ask away!")
 
@@ -382,6 +408,31 @@ def render_empty_state():
           <div class="step"><div class="num">3</div><h4>Ask</h4><p>Chat with your documents below.</p></div>
         </div>
         """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_suggestions(suggestions):
+    st.markdown('<div class="muted">✨ Suggested for these documents:</div>', unsafe_allow_html=True)
+    # One per row: AI-written questions are too long for side-by-side columns
+    for i, suggestion in enumerate(suggestions):
+        if st.button(f"💬 {suggestion}", key=f"suggestion_{i}", use_container_width=True):
+            st.session_state.picked_suggestion = suggestion
+            st.rerun()
+
+
+# Only this fragment re-runs while Gemini writes suggestions, so the chat input
+# below stays usable and keeps whatever the user is typing.
+@st.fragment(run_every=1)
+def render_pending_suggestions():
+    entry = get_session_entry()
+    if entry is None or entry.get("suggestions") is not None:
+        st.rerun(scope="app")
+    st.markdown(
+        '<div class="framing"><span class="sparkle">✨</span>'
+        '<span>Framing questions for your documents<span class="dots"></span> '
+        "You can start typing below anytime.</span></div>"
+        '<div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>',
         unsafe_allow_html=True,
     )
 
@@ -425,17 +476,14 @@ def main():
         with st.chat_message(message["role"], avatar="🧑" if message["role"] == "user" else "📄"):
             st.markdown(message["content"])
 
-    question = None
     if not st.session_state.messages:
-        st.markdown('<div class="muted">✨ Suggested for these documents:</div>', unsafe_allow_html=True)
-        suggestions = entry.get("suggestions") or FALLBACK_QUESTIONS
-        # One per row: AI-written questions are too long for side-by-side columns
-        for i, suggestion in enumerate(suggestions):
-            if st.button(f"💬 {suggestion}", key=f"suggestion_{i}", use_container_width=True):
-                question = suggestion
+        if entry.get("suggestions") is None:
+            render_pending_suggestions()
+        else:
+            render_suggestions(entry["suggestions"])
 
     typed = st.chat_input("Ask a question about your documents…")
-    question = typed or question
+    question = typed or st.session_state.pop("picked_suggestion", None)
     if not question:
         return
 
