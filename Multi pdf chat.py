@@ -6,6 +6,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 import os
 import gc
 import ctypes
+import json
 import threading
 import time
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
@@ -30,14 +31,30 @@ MAX_CHARS = int(os.getenv("MAX_CHARS", "500000"))
 IDLE_TIMEOUT_SECONDS = int(os.getenv("IDLE_TIMEOUT_MINUTES", "15")) * 60
 JANITOR_INTERVAL_SECONDS = 60
 
-SUGGESTED_QUESTIONS = [
+# Used only if Gemini can't generate document-specific suggestions
+FALLBACK_QUESTIONS = [
     "Summarize these documents in 5 bullet points",
     "What are the key dates and deadlines?",
     "List the most important numbers mentioned",
 ]
+SUGGESTION_COUNT = 3
+SUGGESTION_EXCERPT_CHARS = 2500
+
+SUGGESTION_PROMPT = """You help people explore documents they uploaded. Based on the excerpts below, write the {count} questions a reader would most likely want answered from these documents.
+Rules: each question must be answerable from the documents, specific to their content (mention concrete topics, never generic ones like "summarize this"), and under 12 words.
+Return only a JSON array of {count} strings.
+
+Document excerpts:
+{excerpt}"""
 
 CSS = """
 <style>
+:root {
+    --bg: #F7F7FB; --surface: #FFFFFF; --surface-2: #F3F4F6; --border: #E5E7EB;
+    --text: #1F2937; --heading: #111827; --muted: #6B7280;
+    --chip-bg: #EEF2FF; --chip-text: #3730A3; --chip-sub: #6366F1; --num-bg: #EEF2FF;
+    --accent: #4F46E5;
+}
 #MainMenu, footer, [data-testid="stToolbar"] {visibility: hidden;}
 .block-container {padding-top: 2rem; max-width: 860px;}
 .hero {
@@ -45,34 +62,80 @@ CSS = """
     border-radius: 18px; padding: 28px 32px; color: white; margin-bottom: 1.5rem;
     box-shadow: 0 10px 30px rgba(79, 70, 229, 0.25);
 }
-.hero h1 {color: white; font-size: 2rem; margin: 0 0 6px 0; padding: 0;}
-.hero p {color: rgba(255,255,255,0.88); margin: 0; font-size: 1.02rem;}
+.hero h1 {color: white !important; font-size: 2rem; margin: 0 0 6px 0; padding: 0;}
+.hero p {color: rgba(255,255,255,0.88) !important; margin: 0; font-size: 1.02rem;}
 .steps {display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 8px 0 24px 0;}
 .step {
-    background: white; border: 1px solid #E5E7EB; border-radius: 14px; padding: 18px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .step .num {
     display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
-    border-radius: 50%; background: #EEF2FF; color: #4F46E5; font-weight: 700; margin-bottom: 8px;
+    border-radius: 50%; background: var(--num-bg); color: var(--accent); font-weight: 700; margin-bottom: 8px;
 }
-.step h4 {margin: 0 0 4px 0; font-size: 1rem; color: #111827;}
-.step p {margin: 0; color: #6B7280; font-size: 0.9rem;}
+.step h4 {margin: 0 0 4px 0; font-size: 1rem; color: var(--heading) !important;}
+.step p {margin: 0; color: var(--muted) !important; font-size: 0.9rem;}
 .doc-chip {
-    background: #EEF2FF; color: #3730A3; border-radius: 10px; padding: 8px 10px;
+    background: var(--chip-bg); color: var(--chip-text); border-radius: 10px; padding: 8px 10px;
     margin-bottom: 6px; font-size: 0.88rem; overflow-wrap: anywhere;
 }
-.doc-chip small {color: #6366F1;}
-.brand {font-size: 1.35rem; font-weight: 800; color: #4F46E5; margin-bottom: 0.2rem;}
-.muted {color: #6B7280; font-size: 0.85rem;}
+.doc-chip small {color: var(--chip-sub);}
+.brand {font-size: 1.35rem; font-weight: 800; color: var(--accent); margin-bottom: 0.2rem;}
+.muted {color: var(--muted) !important; font-size: 0.85rem;}
 [data-testid="stChatMessage"] {
-    background: white; border: 1px solid #E5E7EB; border-radius: 14px; padding: 12px 16px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px 16px;
 }
 @media (max-width: 640px) {
     .steps {grid-template-columns: 1fr;}
     .hero {padding: 22px;}
     .hero h1 {font-size: 1.6rem;}
 }
+</style>
+"""
+
+# Streamlit's theme is set per server, so dark mode is applied per session by
+# overriding the palette and the widgets that read colours from the base theme.
+DARK_CSS = """
+<style>
+:root {
+    --bg: #0B1020; --surface: #151B2E; --surface-2: #1D2439; --border: #2A3350;
+    --text: #E5E7EB; --heading: #F9FAFB; --muted: #9CA3AF;
+    --chip-bg: #1E2350; --chip-text: #C7D2FE; --chip-sub: #A5B4FC; --num-bg: #262B5C;
+    --accent: #818CF8;
+    color-scheme: dark;
+}
+[data-testid="stApp"], [data-testid="stAppViewContainer"], [data-testid="stMain"],
+[data-testid="stBottom"], [data-testid="stBottom"] > div, [data-testid="stBottomBlockContainer"] {
+    background-color: var(--bg) !important;
+}
+[data-testid="stHeader"] {background: transparent !important;}
+[data-testid="stSidebar"], [data-testid="stSidebarContent"] {
+    background-color: var(--surface) !important; border-right: 1px solid var(--border);
+}
+[data-testid="stApp"] p, [data-testid="stApp"] li, [data-testid="stApp"] label,
+[data-testid="stApp"] span, [data-testid="stMarkdownContainer"],
+[data-testid="stWidgetLabel"], [data-testid="stCaptionContainer"] {
+    color: var(--text);
+}
+[data-testid="stApp"] h1, [data-testid="stApp"] h2, [data-testid="stApp"] h3,
+[data-testid="stApp"] strong {color: var(--heading);}
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] p {color: var(--muted) !important;}
+[data-testid="stSidebarCollapseButton"] svg, [data-testid="stExpandSidebarButton"] svg {fill: var(--text);}
+[data-testid="stFileUploaderDropzone"] {background-color: var(--surface-2) !important; color: var(--text);}
+[data-testid="stFileUploaderDropzoneInstructions"] span, [data-testid="stFileUploaderDropzoneInstructions"] small {color: var(--muted) !important;}
+[data-testid="stFileUploader"] section + div, [data-testid="stFileUploaderFile"] {color: var(--text);}
+[data-testid="stBaseButton-secondary"] {
+    background-color: var(--surface-2) !important; color: var(--text) !important; border-color: var(--border) !important;
+}
+[data-testid="stBaseButton-secondary"]:hover {border-color: var(--accent) !important; color: var(--heading) !important;}
+[data-testid="stBaseButton-primary"] {background-color: #6366F1 !important; border-color: #6366F1 !important;}
+[data-testid="stChatInput"], [data-testid="stChatInput"] > div {
+    background-color: var(--surface) !important; border-color: var(--border) !important;
+}
+[data-testid="stChatInputTextArea"] {background-color: var(--surface) !important; color: var(--text) !important;}
+[data-testid="stChatInputTextArea"]::placeholder {color: var(--muted) !important;}
+[data-testid="stAlert"] > div {background-color: var(--surface-2) !important;}
+hr {border-color: var(--border) !important;}
 </style>
 """
 
@@ -135,10 +198,12 @@ def get_session_entry():
         return entry
 
 
-def set_session_store(store, docs):
+def set_session_store(store, docs, suggestions):
     registry = get_registry()
     with registry["lock"]:
-        registry["stores"][current_session_id()] = {"store": store, "docs": docs, "last_used": time.time()}
+        registry["stores"][current_session_id()] = {
+            "store": store, "docs": docs, "suggestions": suggestions, "last_used": time.time(),
+        }
 
 
 def clear_session_store():
@@ -187,6 +252,42 @@ def build_vector_store(text_chunks):
     return FAISS.from_texts(text_chunks, embedding=embeddings)
 
 
+def sample_excerpt(text):
+    # Beginning, middle and end, so long documents aren't judged by their cover page alone
+    if len(text) <= SUGGESTION_EXCERPT_CHARS * 3:
+        return text
+    middle = len(text) // 2 - SUGGESTION_EXCERPT_CHARS // 2
+    return "\n...\n".join([
+        text[:SUGGESTION_EXCERPT_CHARS],
+        text[middle:middle + SUGGESTION_EXCERPT_CHARS],
+        text[-SUGGESTION_EXCERPT_CHARS:],
+    ])
+
+
+def parse_suggestions(raw):
+    start, end = raw.find("["), raw.rfind("]")
+    if start == -1 or end <= start:
+        return []
+    try:
+        items = json.loads(raw[start:end + 1])
+    except json.JSONDecodeError:
+        return []
+    questions = [q.strip() for q in items if isinstance(q, str) and q.strip()]
+    return questions[:SUGGESTION_COUNT]
+
+
+def generate_suggestions(text):
+    # Suggestions are a nice-to-have: any failure, including model setup, falls back to generic questions
+    try:
+        prompt = PromptTemplate.from_template(SUGGESTION_PROMPT)
+        chain = prompt | ChatGoogleGenerativeAI(model=CHAT_MODEL, temperature=0.4) | StrOutputParser()
+        questions = parse_suggestions(chain.invoke({"count": SUGGESTION_COUNT, "excerpt": sample_excerpt(text)}))
+    except Exception as e:
+        print(f"suggestions failed: {e!r}", flush=True)
+        questions = []
+    return questions if len(questions) == SUGGESTION_COUNT else FALLBACK_QUESTIONS
+
+
 def get_conversational_chain():
 
     prompt_template = """
@@ -213,6 +314,7 @@ def render_sidebar(entry):
     with st.sidebar:
         st.markdown('<div class="brand">📄 ChatPDF</div>', unsafe_allow_html=True)
         st.markdown('<div class="muted">Ask questions about your documents, powered by Gemini.</div>', unsafe_allow_html=True)
+        st.toggle("🌙 Dark mode", key="dark_mode")
         st.divider()
 
         pdf_docs = st.file_uploader(
@@ -261,7 +363,9 @@ def process_uploads(pdf_docs):
             st.session_state.flash = ("error", f"Couldn't index the documents: {type(e).__name__}. Please try again.")
             print(f"indexing failed: {e!r}", flush=True)
             return
-    set_session_store(store, doc_info)
+    with st.spinner("Preparing suggested questions…"):
+        suggestions = generate_suggestions(raw_text)
+    set_session_store(store, doc_info, suggestions)
     st.session_state.messages = []
     st.session_state.flash = ("success", f"Indexed {len(doc_info)} document(s). Ask away!")
 
@@ -282,14 +386,19 @@ def render_empty_state():
 def main():
     st.set_page_config(page_title="ChatPDF", page_icon="📄", layout="centered")
     start_janitor()
-    st.markdown(CSS, unsafe_allow_html=True)
 
     st.session_state.setdefault("messages", [])
     st.session_state.setdefault("uploader_key", 0)
+    st.session_state.setdefault("dark_mode", False)
 
     entry = get_session_entry()
     render_sidebar(entry)
     entry = get_session_entry()
+
+    # Injected after the toggle so a switch takes effect on the same run
+    st.markdown(CSS, unsafe_allow_html=True)
+    if st.session_state.dark_mode:
+        st.markdown(DARK_CSS, unsafe_allow_html=True)
 
     st.markdown(
         '<div class="hero"><h1>Chat with your PDFs</h1>'
@@ -315,10 +424,11 @@ def main():
 
     question = None
     if not st.session_state.messages:
-        st.markdown('<div class="muted">Try one of these:</div>', unsafe_allow_html=True)
-        cols = st.columns(len(SUGGESTED_QUESTIONS))
-        for col, suggestion in zip(cols, SUGGESTED_QUESTIONS):
-            if col.button(suggestion, use_container_width=True):
+        st.markdown('<div class="muted">✨ Suggested for these documents:</div>', unsafe_allow_html=True)
+        suggestions = entry.get("suggestions") or FALLBACK_QUESTIONS
+        cols = st.columns(len(suggestions))
+        for i, (col, suggestion) in enumerate(zip(cols, suggestions)):
+            if col.button(suggestion, key=f"suggestion_{i}", use_container_width=True):
                 question = suggestion
 
     typed = st.chat_input("Ask a question about your documents…")
