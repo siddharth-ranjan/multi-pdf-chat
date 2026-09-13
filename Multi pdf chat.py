@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-001")
-CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-2.5-flash")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-3.6-flash")
 
 # Upload limits keep memory use predictable on a small server.
 # The per-file limit is also enforced by Streamlit itself (server.maxUploadSize).
