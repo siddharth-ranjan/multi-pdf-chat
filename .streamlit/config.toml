@@ -1,0 +1,5 @@
+[server]
+# Largest single PDF accepted, in MB. The app also caps the total upload.
+maxUploadSize = 10
+# Seconds a disconnected session is kept before Streamlit discards it.
+disconnectedSessionTTL = 60
