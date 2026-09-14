@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>ChatPDF · Chat with your PDFs</title>
+  <meta name="description" content="Upload up to 3 PDFs and ask questions about them. Streaming answers with the exact page each one came from. Free, no sign-up, files deleted when you leave.">
+  <meta name="theme-color" content="#FAFAFC" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0B0B0F" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="https://chatpdf.siddharthranjan.app/">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ChatPDF">
+  <meta property="og:title" content="ChatPDF · Chat with your PDFs">
+  <meta property="og:description" content="Upload PDFs and ask anything. Answers stream in with the page they came from.">
+  <meta property="og:url" content="https://chatpdf.siddharthranjan.app/">
+  <meta property="og:image" content="https://chatpdf.siddharthranjan.app/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ChatPDF · Chat with your PDFs">
+  <meta name="twitter:description" content="Upload PDFs and ask anything. Answers stream in with the page they came from.">
+  <meta name="twitter:image" content="https://chatpdf.siddharthranjan.app/og.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/theme.js"></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app" id="app" data-view="upload">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="ChatPDF home">
+        <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+        <span>ChatPDF</span>
+      </a>
+      <div class="topbar-docs" id="topbar-docs" aria-label="Your documents" hidden></div>
+      <div class="topbar-actions">
+        <button class="btn new-chat" id="new-chat" type="button" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          <span class="btn-label">New chat</span>
+        </button>
+        <button class="btn icon-btn" id="theme-toggle" type="button" aria-label="Switch between light and dark mode">
+          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="upload-view" id="upload-view">
+      <section class="hero">
+        <span class="eyebrow"><span class="dot"></span>Free · No sign-up · Powered by Gemini</span>
+        <h1>Ask your PDFs <span class="grad">anything</span></h1>
+        <p class="lede">Drop in a handbook, contract, paper or report. Get answers in seconds, with the exact page each one came from.</p>
+      </section>
+
+      <section class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload PDFs: drop files here or press to browse" aria-describedby="limits">
+        <input type="file" id="file-input" accept="application/pdf,.pdf" multiple hidden>
+        <div class="dz-idle" id="dz-idle">
+          <div class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7 9l5-5 5 5"/><path d="M20 15v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3"/></svg></div>
+          <p class="dz-title"><strong>Drop your PDFs here</strong></p>
+          <p class="dz-hint" id="limits">Up to 3 files · 10 MB total · 100 pages</p>
+          <span class="btn btn-primary dz-button">Choose PDFs</span>
+        </div>
+        <div class="dz-busy" id="dz-busy" hidden>
+          <ul class="file-list" id="file-list"></ul>
+          <div class="progress" aria-hidden="true"><div class="bar" id="progress-bar"></div></div>
+          <p class="dz-status" role="status"><span class="spinner" aria-hidden="true"></span><span id="upload-status">Uploading…</span></p>
+        </div>
+      </section>
+      <p class="notice" id="upload-notice" role="alert" hidden></p>
+
+      <ul class="features">
+        <li>
+          <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v15H6.5A2.5 2.5 0 0 0 4 20.5 1.5 1.5 0 0 0 5.5 22H19"/><path d="M9 8h6"/></svg></span>
+          <div><strong>Cited answers</strong><span class="f-text">Tap a citation to see the exact passage and page.</span></div>
+        </li>
+        <li>
+          <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg></span>
+          <div><strong>Instant replies</strong><span class="f-text">Answers stream in as they're written, with smart follow-ups.</span></div>
+        </li>
+        <li>
+          <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+          <div><strong>Private by design</strong><span class="f-text">Files live in memory and are deleted when you close the tab.</span></div>
+        </li>
+      </ul>
+      <noscript><p class="notice error">ChatPDF needs JavaScript to upload and chat.</p></noscript>
+      <footer class="site-footer">Built by <a href="https://github.com/siddharth-ranjan">Siddharth Ranjan</a> · <a href="https://github.com/siddharth-ranjan/multi-pdf-chat">Source on GitHub</a></footer>
+    </main>
+
+    <main class="chat-view" id="chat-view" hidden>
+      <div class="banner" id="banner" role="alert" hidden>
+        <span id="banner-text"></span>
+        <button class="btn btn-small" id="banner-action" type="button">Upload PDFs</button>
+      </div>
+      <div class="thread" id="thread" aria-live="polite"></div>
+      <div class="composer-wrap">
+        <form class="composer" id="composer">
+          <label class="sr-only" for="question">Ask a question about your documents</label>
+          <textarea id="question" rows="1" maxlength="1000" placeholder="Ask about your documents…" enterkeyhint="send"></textarea>
+          <button class="send" id="send" type="submit" aria-label="Send" disabled></button>
+        </form>
+        <p class="composer-hint">Answers come only from your documents, but can still be wrong. Check the cited pages.</p>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
