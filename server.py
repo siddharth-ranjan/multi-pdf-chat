@@ -23,8 +23,9 @@ from pydantic import BaseModel, Field
 import rag
 
 IDLE_TIMEOUT_SECONDS = int(os.getenv("IDLE_TIMEOUT_MINUTES", "15")) * 60
-# The page pings every 30s; missing pings for this long means the tab is gone
-ABANDONED_SECONDS = int(os.getenv("ABANDONED_SECONDS", "180"))
+# The page pings every 30s; missing pings for this long means the tab is gone.
+# Generous because phones pause background tabs while the user checks another app.
+ABANDONED_SECONDS = int(os.getenv("ABANDONED_SECONDS", "600"))
 MAX_SESSIONS = int(os.getenv("MAX_SESSIONS", "20"))
 MAX_CONCURRENT_INDEXING = int(os.getenv("MAX_CONCURRENT_INDEXING", "2"))
 JANITOR_INTERVAL_SECONDS = 30

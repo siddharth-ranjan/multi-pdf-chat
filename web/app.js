@@ -761,16 +761,26 @@
       docs: saved.docs || [],
       messages: (saved.messages || []).filter((m) => m.status !== "streaming"),
     });
-    const body = await checkSession();
-    if (!body) {
-      Object.assign(state, { sessionId: null, docs: [], messages: [], expired: false });
+    let res = null;
+    try {
+      res = await fetch(`/api/sessions/${state.sessionId}`, { cache: "no-store" });
+    } catch (e) { /* offline: show the saved chat; the heartbeat retries */ }
+
+    if (res?.status === 404) {
+      Object.assign(state, { sessionId: null, docs: [], messages: [] });
       save();
-      return showUpload(state.expired === false ? "Your previous chat expired, so its documents were deleted. Upload them again to continue." : "");
+      return showUpload("Your previous chat expired, so its documents were deleted. Upload them again to continue.");
     }
-    state.suggestions = body.suggestions;
+    const body = res?.ok ? await res.json() : null;
+    state.suggestions = body ? body.suggestions : [];
     showChat();
-    if (!body.suggestions) pollSuggestions();
+    if (body && !body.suggestions) pollSuggestions();
   }
+
+  // Phones pause timers in background tabs; check straight away when the user comes back
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && state.sessionId && !state.expired) checkSession();
+  });
 
   setStreaming(false);
   loadConfig();

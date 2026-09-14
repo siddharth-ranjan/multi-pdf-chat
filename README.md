@@ -47,6 +47,7 @@ Set these in `.env`:
 | `EMBEDDING_MODEL` | `models/gemini-embedding-001` | Embedding model |
 | `MAX_FILES` / `MAX_TOTAL_MB` / `MAX_PAGES` | `3` / `10` / `100` | Upload limits |
 | `IDLE_TIMEOUT_MINUTES` | `15` | Delete a chat after this long without questions |
+| `ABANDONED_SECONDS` | `600` | Delete a chat this long after its tab stops sending heartbeats |
 | `MAX_SESSIONS` | `20` | Concurrent chats kept in memory |
 
 ## Deploy
