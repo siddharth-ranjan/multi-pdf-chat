@@ -42,8 +42,8 @@ Set these in `.env`:
 | --- | --- | --- |
 | `GOOGLE_API_KEY` | (required) | Gemini API key |
 | `CHAT_MODEL` | `gemini-3.5-flash-lite` | Model that writes answers |
-| `FALLBACK_CHAT_MODEL` | `gemma-4-26b-a4b-it` | Answers with this when `CHAT_MODEL` hits its rate limit |
-| `SUGGESTION_MODEL` | `gemma-4-26b-a4b-it` | Model that writes starter questions |
+| `FALLBACK_CHAT_MODEL` | `gemma-4-26b-a4b-it` | Used for answers and suggestions when the main model hits its rate limit |
+| `SUGGESTION_MODEL` | same as `CHAT_MODEL` | Model that writes starter questions |
 | `EMBEDDING_MODEL` | `models/gemini-embedding-001` | Embedding model |
 | `MAX_FILES` / `MAX_TOTAL_MB` / `MAX_PAGES` | `3` / `10` / `100` | Upload limits |
 | `IDLE_TIMEOUT_MINUTES` | `15` | Delete a chat after this long without questions |

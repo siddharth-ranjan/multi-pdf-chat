@@ -14,11 +14,11 @@ from pypdf import PdfReader
 load_dotenv()
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "models/gemini-embedding-001")
-# Free-tier daily quotas differ a lot per model: flash-lite answers well, and Gemma's much
-# larger quota covers background suggestions and answers once flash-lite's quota runs out
+# Free-tier daily quotas differ a lot per model: flash-lite is fast, and Gemma's much larger
+# (but slower) quota takes over whenever flash-lite is rate limited
 CHAT_MODEL = os.getenv("CHAT_MODEL", "gemini-3.5-flash-lite")
 FALLBACK_CHAT_MODEL = os.getenv("FALLBACK_CHAT_MODEL", "gemma-4-26b-a4b-it")
-SUGGESTION_MODEL = os.getenv("SUGGESTION_MODEL", "gemma-4-26b-a4b-it")
+SUGGESTION_MODEL = os.getenv("SUGGESTION_MODEL", CHAT_MODEL)
 
 # Upload limits keep memory use predictable on a small server
 MAX_FILES = int(os.getenv("MAX_FILES", "3"))
@@ -159,9 +159,15 @@ def parse_suggestions(raw):
 def generate_suggestions(pages):
     # Suggestions are a nice-to-have: any failure falls back to generic questions
     text = "\n".join(p["text"] for p in pages)
+    prompt = SUGGESTION_PROMPT.format(count=SUGGESTION_COUNT, excerpt=sample_excerpt(text))
     try:
-        prompt = SUGGESTION_PROMPT.format(count=SUGGESTION_COUNT, excerpt=sample_excerpt(text))
-        questions = parse_suggestions(text_chain(SUGGESTION_MODEL).invoke(prompt))
+        try:
+            raw = text_chain(SUGGESTION_MODEL).invoke(prompt)
+        except Exception as e:
+            if not is_rate_limit(e) or not FALLBACK_CHAT_MODEL or FALLBACK_CHAT_MODEL == SUGGESTION_MODEL:
+                raise
+            raw = text_chain(FALLBACK_CHAT_MODEL).invoke(prompt)
+        questions = parse_suggestions(raw)
     except Exception as e:
         print(f"suggestions failed: {e!r}", flush=True)
         questions = []

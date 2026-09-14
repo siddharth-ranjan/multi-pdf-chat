@@ -166,6 +166,18 @@ def test_quota_errors_become_friendly_messages(client, chain):
     assert "RESOURCE_EXHAUSTED" not in events[-1]["message"]
 
 
+def test_rate_limited_suggestions_use_the_fallback_model(client, monkeypatch):
+    class LimitedChain(FakeChain):
+        def invoke(self, prompt):
+            raise RuntimeError("429 RESOURCE_EXHAUSTED")
+
+    fallback = FakeChain()
+    fallback.suggestions = '["From Gemma one?", "From Gemma two?", "From Gemma three?"]'
+    monkeypatch.setattr(rag, "text_chain", lambda model: fallback if model == rag.FALLBACK_CHAT_MODEL else LimitedChain())
+    session_id = upload(client).json()["session_id"]
+    assert wait_for_suggestions(client, session_id) == ["From Gemma one?", "From Gemma two?", "From Gemma three?"]
+
+
 def test_suggestions_fall_back_when_model_output_is_unusable(client, chain):
     chain.suggestions = "Sorry, I can't help with that."
     session_id = upload(client).json()["session_id"]
