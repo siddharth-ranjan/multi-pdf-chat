@@ -1,4 +1,6 @@
-streamlit==1.63.0
+fastapi==0.141.1
+uvicorn==0.52.4
+python-multipart==0.0.32
 langchain-community==0.4.2
 langchain-google-genai==4.4.0
 langchain-text-splitters==1.1.2

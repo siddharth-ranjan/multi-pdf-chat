@@ -1,3 +1,9 @@
 chatpdf.siddharthranjan.app {
-	reverse_proxy app:8501
+	request_body {
+		max_size 12MB
+	}
+	reverse_proxy app:8501 {
+		# Send answer text to the browser as soon as it is generated
+		flush_interval -1
+	}
 }
